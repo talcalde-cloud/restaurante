@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Web Restaurante - Python Flask</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f4f6f9; color: #333; }
+        header { background: #1a252f; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        nav button { background: #34495e; color: white; border: none; padding: 8px 15px; margin-left: 5px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        nav button.active { background: #e74c3c; }
+        
+        .container { padding: 20px; max-width: 1200px; margin: auto; }
+        
+        /* ALERTAS */
+        #contenedor-alertas { margin-bottom: 20px; }
+        .alerta { padding: 15px; border-radius: 5px; margin-bottom: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .alerta.danger { background-color: #f8d7da; color: #721c24; border-left: 5px solid #dc3545; }
+        .alerta.warning { background-color: #fff3cd; color: #856404; border-left: 5px solid #ffc107; }
+        .alerta.success { background-color: #d4edda; color: #155724; border-left: 5px solid #28a745; }
+
+        .grid-mesas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
+        .card-mesa { padding: 20px; background: white; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; border-top: 5px solid #28a745; }
+        .card-mesa.Ocupada { border-top-color: #dc3545; background-color: #fff5f5; }
+        .card-mesa.Reservada { border-top-color: #ffc107; background-color: #fffdf0; }
+
+        .seccion { display: none; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .seccion.active { display: block; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        
+        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; background: #3498db; }
+        .btn-danger { background: #e74c3c; }
+        .btn-success { background: #2ecc71; }
+        .btn-warning { background: #f39c12; }
+
+        .kds-card { background: #f8f9fa; border: 2px solid #007bff; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🍽️ Sistema Restaurante (Backend Python)</h1>
+    <nav>
+        <button onclick="cambiarVista('alertas-sec')" class="active">🚨 Alertas</button>
+        <button onclick="cambiarVista('cliente-sec')">🌐 Vista Clientes</button>
+        <button onclick="cambiarVista('pos-sec')">🤵 Camarero / POS</button>
+        <button onclick="cambiarVista('kds-sec')">👨‍🍳 Cocina (KDS)</button>
+        <button onclick="cambiarVista('admin-sec')">📊 Inventario & Admin</button>
+    </nav>
+</header>
+
+<div class="container">
+
+    <!-- BANNER GENERAL DE ALERTAS -->
+    <div id="contenedor-alertas"></div>
+
+    <!-- SECCIÓN ALERTAS DE SISTEMA -->
+    <div id="alertas-sec" class="seccion active">
+        <h2>🚨 Panel Central de Alertas y Notificaciones</h2>
+        <p style="margin-top: 10px;">Monitoreo en tiempo real de inventarios bajos, retrasos en cocina y problemas del sistema generados por el backend en Python.</p>
+        <div id="lista-alertas-detallada" style="margin-top: 20px;"></div>
+    </div>
+
+    <!-- VISTA CLIENTES (RESERVAS) -->
+    <div id="cliente-sec" class="seccion">
+        <h2>📅 Reservar Mesa en Línea</h2>
+        <form id="form-reserva" onsubmit="hacerReserva(event)" style="max-width: 400px; margin-top: 15px;">
+            <label>Nombre:</label>
+            <input type="text" id="res-nombre" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+            
+            <label>Teléfono:</label>
+            <input type="text" id="res-tel" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+            
+            <label>Mesa:</label>
+            <select id="res-mesa" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+            
+            <label>Fecha y Hora:</label>
+            <input type="datetime-local" id="res-fecha" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+            
+            <label>Comensales:</label>
+            <input type="number" id="res-cant" min="1" max="10" value="2" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+            
+            <button type="submit" class="btn btn-success">Confirmar Reserva</button>
+        </form>
+    </div>
+
+    <!-- CAMARERO / POS -->
+    <div id="pos-sec" class="seccion">
+        <h2>🤵 Mapa de Mesas y Toma de Pedidos</h2>
+        <div class="grid-mesas" id="grid-mesas"></div>
+
+        <div style="margin-top: 30px; background: #fafafa; padding: 15px; border-radius: 5px;">
+            <h3>Crear Pedido Rápido</h3>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <select id="pos-mesa-select" style="padding: 8px;"></select>
+                <select id="pos-plato-select" style="padding: 8px;"></select>
+                <button onclick="agregarPedidoPOS()" class="btn btn-success">Enviar a Cocina</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- COCINA KDS -->
+    <div id="kds-sec" class="seccion">
+        <h2>👨‍🍳 Pantalla de Cocina (KDS)</h2>
+        <div id="lista-kds" style="margin-top: 15px;"></div>
+    </div>
+
+    <!-- ADMIN & INVENTARIO -->
+    <div id="admin-sec" class="seccion">
+        <h2>📊 Control de Inventario y Alertas de Stock</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ingrediente</th>
+                    <th>Cantidad Actual</th>
+                    <th>Mínimo Requerido</th>
+                    <th>Estado / Alerta</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-inventario"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    let estadoGlobal = {};
+
+    function cambiarVista(idSeccion) {
+        document.querySelectorAll('.seccion').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById(idSeccion).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    async function cargarEstado() {
+        const res = await fetch('/api/estado_general');
+        estadoGlobal = await res.json();
+        
+        renderizarAlertas();
+        renderizarMesas();
+        renderizarKDS();
+        renderizarInventario();
+    }
+
+    function renderizarAlertas() {
+        const contenedor = document.getElementById('contenedor-alertas');
+        const listaDetallada = document.getElementById('lista-alertas-detallada');
+        
+        contenedor.innerHTML = '';
+        listaDetallada.innerHTML = '';
+
+        if (estadoGlobal.alertas.length === 0) {
+            contenedor.innerHTML = `<div class="alerta success">✅ Todo en orden. No hay alertas críticas registradas por el servidor Python.</div>`;
+            listaDetallada.innerHTML = `<p>No hay alertas activas en este momento.</p>`;
+            return;
+        }
+
+        estadoGlobal.alertas.forEach(a => {
+            const html = `
+                <div class="alerta ${a.tipo}">
+                    <div>
+                        <strong>${a.titulo}</strong><br>
+                        <span>${a.mensaje}</span>
+                    </div>
+                </div>
+            `;
+            contenedor.innerHTML += html;
+            listaDetallada.innerHTML += html;
+        });
+    }
+
+    function renderizarMesas() {
+        const grid = document.getElementById('grid-mesas');
+        const selectReserva = document.getElementById('res-mesa');
+        const selectPOS = document.getElementById('pos-mesa-select');
+        
+        grid.innerHTML = '';
+        selectReserva.innerHTML = '';
+        selectPOS.innerHTML = '';
+
+        estadoGlobal.mesas.forEach(m => {
+            grid.innerHTML += `
+                <div class="card-mesa ${m.estado}">
+                    <h3>Mesa ${m.numero}</h3>
+                    <p>Cap: ${m.capacidad} pers.</p>
+                    <p><strong>${m.estado}</strong></p>
+                </div>
+            `;
+
+            if (m.estado === 'Disponible') {
+                selectReserva.innerHTML += `<option value="${m.id}">Mesa ${m.numero} (${m.capacidad} pers)</option>`;
+            }
+            selectPOS.innerHTML += `<option value="${m.id}">Mesa ${m.numero}</option>`;
+        });
+
+        const selectPlato = document.getElementById('pos-plato-select');
+        selectPlato.innerHTML = '';
+        estadoGlobal.platos.forEach(p => {
+            selectPlato.innerHTML += `<option value="${p.id}">${p.nombre} - $${p.precio}</option>`;
+        });
+    }
+
+    function renderizarKDS() {
+        const kds = document.getElementById('lista-kds');
+        kds.innerHTML = '';
+
+        if (estadoGlobal.pedidos.length === 0) {
+            kds.innerHTML = '<p>No hay pedidos pendientes en cocina.</p>';
+            return;
+        }
+
+        estadoGlobal.pedidos.forEach(p => {
+            let platosTexto = p.detalles.map(d => `${d.cantidad}x ${d.nombre}`).join(', ');
+            
+            kds.innerHTML += `
+                <div class="kds-card">
+                    <h3>Pedido #${p.id} - Mesa ${p.mesa_id}</h3>
+                    <p><strong>Platos:</strong> ${platosTexto}</p>
+                    <p><strong>Estado:</strong> ${p.estado}</p>
+                    <br>
+                    ${p.estado === 'Pendiente' ? `<button class="btn btn-warning" onclick="cambiarEstadoPedido(${p.id}, 'En Preparación')">Iniciar Preparación</button>` : ''}
+                    ${p.estado === 'En Preparación' ? `<button class="btn btn-success" onclick="cambiarEstadoPedido(${p.id}, 'Listo')">Marcar Listo</button>` : ''}
+                    ${p.estado === 'Listo' ? `<button class="btn btn-danger" onclick="cerrarMesa(${p.id})">Cobrar y Liberar Mesa</button>` : ''}
+                </div>
+            `;
+        });
+    }
+
+    function renderizarInventario() {
+        const tabla = document.getElementById('tabla-inventario');
+        tabla.innerHTML = '';
+
+        estadoGlobal.inventario.forEach(i => {
+            const esBajo = i.cantidad <= i.stock_minimo;
+            tabla.innerHTML += `
+                <tr style="${esBajo ? 'background-color: #ffe6e6;' : ''}">
+                    <td>${i.ingrediente}</td>
+                    <td>${i.cantidad} ${i.unidad}</td>
+                    <td>${i.stock_minimo} ${i.unidad}</td>
+                    <td>
+                        ${esBajo 
+                            ? '<span style="color: red; font-weight: bold;">⚠️ STOCK CRÍTICO</span>' 
+                            : '<span style="color: green;">✅ OK</span>'}
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    async function hacerReserva(e) {
+        e.preventDefault();
+        const payload = {
+            nombre: document.getElementById('res-nombre').value,
+            telefono: document.getElementById('res-tel').value,
+            mesa_id: document.getElementById('res-mesa').value,
+            fecha_hora: document.getElementById('res-fecha').value,
+            comensales: document.getElementById('res-cant').value
+        };
+
+        const res = await fetch('/api/reservas', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        alert(data.mensaje);
+        cargarEstado();
+    }
+
+    async function agregarPedidoPOS() {
+        const mesaId = document.getElementById('pos-mesa-select').value;
+        const platoId = document.getElementById('pos-plato-select').value;
+        const plato = estadoGlobal.platos.find(p => p.id == platoId);
+
+        const payload = {
+            mesa_id: mesaId,
+            camarero: "Camarero 1",
+            total: plato.precio,
+            items: [{ plato_id: plato.id, cantidad: 1, precio: plato.precio }]
+        };
+
+        const res = await fetch('/api/pedidos', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        alert(data.mensaje);
+        cargarEstado();
+    }
+
+    async function cambiarEstadoPedido(id, nuevoEstado) {
+        await fetch(`/api/pedidos/${id}/estado`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ estado: nuevoEstado })
+        });
+        cargarEstado();
+    }
+
+    async function cerrarMesa(id) {
+        const res = await fetch(`/api/pedidos/${id}/cerrar`, { method: 'POST' });
+        const data = await res.json();
+        alert(data.mensaje);
+        cargarEstado();
+    }
+
+    // Cargar estado inicial y refrescar cada 5 segundos
+    cargarEstado();
+    setInterval(cargarEstado, 5000);
+</script>
+
+</body>
+</html>
